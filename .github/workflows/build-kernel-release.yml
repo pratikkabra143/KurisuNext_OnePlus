@@ -94,6 +94,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_HTTP_TIMEOUT: 600
+      KSU_PRIVATE_TOKEN: ${{ secrets.KSU_PRIVATE_TOKEN }}
     steps:
       - name: 📥 Checkout Code (to access configs/)
         uses: actions/checkout@v6
@@ -226,6 +227,10 @@ jobs:
           RETRY_DELAY=5 # Seconds to wait between retries
           
           echo "Resolving $ksu_type hash ($ksu_ref)..."
+          
+          if [ -n "${KSU_PRIVATE_TOKEN:-}" ]; then
+            export GH_TOKEN="$KSU_PRIVATE_TOKEN"
+          fi
           
           until [ $RETRY_COUNT -ge $MAX_RETRIES ]; do
             RESULT=$(gh api graphql -f query="$QUERY" -f owner="$KSU_REPO_OWNER" -f name="$KSU_REPO_NAME" -f headRef="$HEAD_REF" -f tagRef="$TAG_REF" -f objRef="$ksu_ref" 2>/dev/null)
@@ -536,6 +541,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.set-op-model.outputs.matrix) }}
+    env:
+      KSU_PRIVATE_TOKEN: ${{ secrets.KSU_PRIVATE_TOKEN }}
     outputs:
       ksun_ver: ${{ steps.build-stat.outputs.ksu_version }}
       ksu_ver: ${{ steps.build-stat.outputs.ksu_version }}

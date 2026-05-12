@@ -860,19 +860,28 @@ runs:
         sed -i 's/protected_modules = \[.*\]/protected_modules = []/' common/modules.bzl || true
         echo "::endgroup::"
 
-    - name: Add KernelSU Next
+    - name: Add KurisuNext
       shell: bash
       if: ${{ inputs.ksu_type == 'KSUN' }}
       run: |
         set -euo pipefail
-        echo "::group::Add KernelSU Next"
+        echo "::group::Add KurisuNext"
         cd "$KERNEL_PLATFORM_FOLDER"
-        echo "Adding KernelSU Next..."
+        echo "Adding KurisuNext..."
         KSU_INPUT="${{ inputs.ksu_branch_or_hash }}"
-        if [ -z "$KSU_INPUT" ]; then
-          curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/pratikkabra143/KurisuNext/dev/kernel/setup.sh" | bash -
+        if [ -n "${KSU_PRIVATE_TOKEN:-}" ]; then
+          git config --global url."https://${KSU_PRIVATE_TOKEN}@github.com/pratikkabra143/KurisuNext".insteadOf "https://github.com/pratikkabra143/KurisuNext"
+          if [ -z "$KSU_INPUT" ]; then
+            curl -H "Authorization: token ${KSU_PRIVATE_TOKEN}" --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/pratikkabra143/KurisuNext/dev/kernel/setup.sh" | bash -
+          else
+            curl -H "Authorization: token ${KSU_PRIVATE_TOKEN}" --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/pratikkabra143/KurisuNext/dev/kernel/setup.sh" | bash -s "$KSU_INPUT"
+          fi
         else
-          curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/pratikkabra143/KurisuNext/dev/kernel/setup.sh" | bash -s "$KSU_INPUT"
+          if [ -z "$KSU_INPUT" ]; then
+            curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/pratikkabra143/KurisuNext/dev/kernel/setup.sh" | bash -
+          else
+            curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/pratikkabra143/KurisuNext/dev/kernel/setup.sh" | bash -s "$KSU_INPUT"
+          fi
         fi
         git submodule update --init --recursive
         cd KernelSU-Next/kernel

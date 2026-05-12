@@ -28,15 +28,18 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
           if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo "Tag not found. Creating backdated tag and release..."
-            
+            echo "Tag not found. Creating backdated tag..."
             GIT_COMMITTER_DATE="2015-01-01T12:00:00" git tag -a "$TAG_NAME" -m "Internal Toolchains Cache"
             git push origin "$TAG_NAME"
-            
+          else
+            echo "Tag '$TAG_NAME' already exists."
+          fi
+          
+          if ! gh release view "$TAG_NAME" --repo "$TARGET_REPO" >/dev/null 2>&1; then
             echo "Release not found. Creating..."
             gh release create "$TAG_NAME" --title "Toolchains Mirror Cache" --notes "Deduplicated Toolchains for Kernel Build" --repo "$TARGET_REPO"
           else
-            echo "Release 'toolchain-cache' already exists. Skipping creation."
+            echo "Release '$TAG_NAME' already exists. Skipping creation."
           fi
 
   generate-mirror-matrix:
@@ -133,7 +136,8 @@ jobs:
                             elif "github.com" in base_url:
                                 dl_url = f"{base_url}/{name}/archive/{rev}.tar.gz"
                             elif "git.codelinaro.org" in base_url or "gitlab.com" in base_url:
-                                dl_url = f"{base_url}/{name}/-/archive/{rev}.tar.gz"
+                                project_basename = name.split('/')[-1]
+                                dl_url = f"{base_url}/{name}/-/archive/{rev}/{project_basename}-{rev}.tar.gz"
                             else:
                                 error_msg = f"❌ [FATAL] Unknown toolchain provider for: {base_url}"
                                 print(f"::error::{error_msg}")
@@ -176,7 +180,65 @@ jobs:
           else
             echo "📥 Not found. Downloading ${{ matrix.type_label }} from source..."
             
-            aria2c -x16 -s16 -k1M -j5 --file-allocation=none --console-log-level=error --summary-interval=0 --retry-wait=5 --max-tries=10 -o "$FILENAME" "${{ matrix.url }}"
+            DL_SUCCESS=false
+            
+            # Attempt 1: Direct archive download
+            if aria2c -x16 -s16 -k1M -j5 --file-allocation=none --console-log-level=error --summary-interval=0 --retry-wait=5 --max-tries=3 -o "$FILENAME" "${{ matrix.url }}"; then
+              DL_SUCCESS=true
+            else
+              echo "⚠️ Archive download failed. Trying git clone fallback..."
+              rm -f "$FILENAME"
+              
+              # Extract the git clone URL from the archive URL
+              # CodeLinaro/GitLab: https://host/group/project/-/archive/rev/name.tar.gz -> https://host/group/project.git
+              # Googlesource: https://host/project/+archive/rev.tar.gz -> https://host/project.git
+              CLONE_URL=""
+              REPO_NAME="${{ matrix.name }}"
+              DL_URL="${{ matrix.url }}"
+              
+              if echo "$DL_URL" | grep -q "git.codelinaro.org\|gitlab.com"; then
+                CLONE_URL=$(echo "$DL_URL" | sed 's|/-/archive/.*||').git
+              elif echo "$DL_URL" | grep -q "googlesource.com"; then
+                CLONE_URL=$(echo "$DL_URL" | sed 's|/+archive/.*||')
+              elif echo "$DL_URL" | grep -q "github.com"; then
+                CLONE_URL=$(echo "$DL_URL" | sed 's|/archive/.*||').git
+              fi
+              
+              if [ -n "$CLONE_URL" ]; then
+                echo "📦 Cloning from: $CLONE_URL (rev: ${{ matrix.rev }})"
+                TMPDIR=$(mktemp -d)
+                if git clone --depth 1 --single-branch "$CLONE_URL" "$TMPDIR/repo" 2>/dev/null; then
+                  cd "$TMPDIR/repo"
+                  git fetch --depth 1 origin "${{ matrix.rev }}" 2>/dev/null || true
+                  git checkout "${{ matrix.rev }}" 2>/dev/null || true
+                  cd - > /dev/null
+                  tar czf "$FILENAME" -C "$TMPDIR" repo
+                  rm -rf "$TMPDIR"
+                  DL_SUCCESS=true
+                else
+                  # Try full fetch with just the commit
+                  rm -rf "$TMPDIR"
+                  TMPDIR=$(mktemp -d)
+                  if git init "$TMPDIR/repo" && \
+                     cd "$TMPDIR/repo" && \
+                     git remote add origin "$CLONE_URL" && \
+                     git fetch --depth 1 origin "${{ matrix.rev }}" && \
+                     git checkout FETCH_HEAD; then
+                    cd - > /dev/null
+                    tar czf "$FILENAME" -C "$TMPDIR" repo
+                    DL_SUCCESS=true
+                  else
+                    cd - > /dev/null 2>&1 || true
+                  fi
+                  rm -rf "$TMPDIR"
+                fi
+              fi
+            fi
+            
+            if [ "$DL_SUCCESS" != "true" ]; then
+              echo "::error::❌ All download methods failed for ${{ matrix.type_label }} (${{ matrix.rev }})"
+              exit 1
+            fi
             
             FILE_SIZE=$(stat -c%s "$FILENAME")
             MAX_SIZE=2000000000 # ~1.86GB

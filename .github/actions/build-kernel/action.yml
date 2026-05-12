@@ -342,7 +342,7 @@ runs:
         KERNEL_PATCHES_DIR="$GITHUB_WORKSPACE/kernel_patches"
         SUSFS_DIR="$GITHUB_WORKSPACE/susfs4ksu"
         KSU_DIR="$KERNEL_PLATFORM_DIR/KernelSU"
-        KSUN_DIR="$KERNEL_PLATFORM_DIR/KernelSU-Next"
+        KSUN_DIR="$KERNEL_PLATFORM_DIR/KurisuNext"
         mkdir -p "$ARTIFACTS_DIR"
         mkdir -p "$DEBUG_ARTIFACTS_DIR"
         
@@ -884,7 +884,7 @@ runs:
           fi
         fi
         git submodule update --init --recursive
-        cd KernelSU-Next/kernel
+        cd KurisuNext/kernel
         
         COMMITS_COUNT=$(/usr/bin/git rev-list --count HEAD)
         

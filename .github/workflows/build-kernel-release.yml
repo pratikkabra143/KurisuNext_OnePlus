@@ -17,18 +17,15 @@ on:
         required: true
         type: choice
         options:
-          - OOS14+15+16
           - OOS15+16
-          - OOS14+15
           - OOS16
           - OOS15
-          - OOS14
           - android16-6.12
           - android15-6.6
           - android14-6.1
           - android13-5.15
           - android12-5.10
-        default: OOS14+15+16
+        default: OOS16
       ksu_options:
         description: 'Enter KernelSU build json'
         required: true

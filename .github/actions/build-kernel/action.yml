@@ -837,7 +837,7 @@ runs:
           return 1
         }
         
-        retry_clone "https://github.com/WildKernels/kernel_patches.git" "main" "1"
+        retry_clone "https://github.com/pratikkabra143/kernel_patches.git" "main" "1"
         
         if [ "${{ env.OP_SUSFS }}" = true ]; then
           echo "Using SUSFS branch/commit: $SUSFS_BRANCH"
@@ -860,19 +860,28 @@ runs:
         sed -i 's/protected_modules = \[.*\]/protected_modules = []/' common/modules.bzl || true
         echo "::endgroup::"
 
-    - name: Add KernelSU Next
+    - name: Add KurisuNext
       shell: bash
       if: ${{ inputs.ksu_type == 'KSUN' }}
       run: |
         set -euo pipefail
-        echo "::group::Add KernelSU Next"
+        echo "::group::Add KurisuNext"
         cd "$KERNEL_PLATFORM_FOLDER"
-        echo "Adding KernelSU Next..."
+        echo "Adding KurisuNext..."
         KSU_INPUT="${{ inputs.ksu_branch_or_hash }}"
-        if [ -z "$KSU_INPUT" ]; then
-          curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -
+        if [ -n "${KSU_PRIVATE_TOKEN:-}" ]; then
+          git config --global url."https://${KSU_PRIVATE_TOKEN}@github.com/pratikkabra143/KernelSU-Next".insteadOf "https://github.com/pratikkabra143/KernelSU-Next"
+          if [ -z "$KSU_INPUT" ]; then
+            curl -H "Authorization: token ${KSU_PRIVATE_TOKEN}" --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/pratikkabra143/KernelSU-Next/dev/kernel/setup.sh" | bash -
+          else
+            curl -H "Authorization: token ${KSU_PRIVATE_TOKEN}" --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/pratikkabra143/KernelSU-Next/dev/kernel/setup.sh" | bash -s "$KSU_INPUT"
+          fi
         else
-          curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s "$KSU_INPUT"
+          if [ -z "$KSU_INPUT" ]; then
+            curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/pratikkabra143/KernelSU-Next/dev/kernel/setup.sh" | bash -
+          else
+            curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/pratikkabra143/KernelSU-Next/dev/kernel/setup.sh" | bash -s "$KSU_INPUT"
+          fi
         fi
         git submodule update --init --recursive
         cd KernelSU-Next/kernel
@@ -888,6 +897,7 @@ runs:
         KSU_VERSION=$(expr $COMMITS_COUNT "+" $BASE_VERSION)
         sed -i "s/DKSU_VERSION=11998/DKSU_VERSION=${KSU_VERSION}/" Makefile
         
+        # Legacy: ksu.c was renamed to core/init.c in newer KSUN versions
         if [ -f ksu.c ]; then
           sed -i 's/#if defined(CONFIG_STACKPROTECTOR) && (defined(CONFIG_ARM64) && !defined(CONFIG_STACKPROTECTOR_PER_TASK))/#if 0/' ksu.c
         fi
@@ -932,9 +942,9 @@ runs:
         echo "Adding KernelSU..."
         KSU_INPUT="${{ inputs.ksu_branch_or_hash }}"
         if [ -z "$KSU_INPUT" ]; then
-          curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
+          curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/pratikkabra143/KernelSU/main/kernel/setup.sh" | bash -
         else
-          curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s "$KSU_INPUT"
+          curl --fail --location --proto '=https' -LSs "https://raw.githubusercontent.com/pratikkabra143/KernelSU/main/kernel/setup.sh" | bash -s "$KSU_INPUT"
         fi
         git submodule update --init --recursive
         cd KernelSU/kernel
@@ -2001,9 +2011,9 @@ runs:
           
           if [ "$KSU_SHA" != "unknown" ]; then
             if [ "${{ inputs.ksu_type }}" = "KSUN" ]; then
-              echo "| **KSUN Commit** | [\`${KSU_SHA:0:8}\`](https://github.com/KernelSU-Next/KernelSU-Next/commit/$KSU_SHA) |"
+              echo "| **KSUN Commit** | [\`${KSU_SHA:0:8}\`](https://github.com/pratikkabra143/KernelSU-Next/commit/$KSU_SHA) |"
             else
-              echo "| **KSU Commit** | [\`${KSU_SHA:0:8}\`](https://github.com/tiann/KernelSU/commit/$KSU_SHA) |"
+              echo "| **KSU Commit** | [\`${KSU_SHA:0:8}\`](https://github.com/pratikkabra143/KernelSU/commit/$KSU_SHA) |"
             fi
           else
             echo "| **KSU Commit** | unknown |"

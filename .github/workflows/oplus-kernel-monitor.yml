@@ -1,8 +1,8 @@
 name: OnePlusOSS Kernel Monitor
 
 on:
-  schedule:
-    - cron: '0 */12 * * *' # Execute every 12 Hrs
+  # schedule:
+  #   - cron: '0 */12 * * *' # Execute every 12 Hrs
   workflow_dispatch:
 
 jobs:
@@ -336,7 +336,7 @@ jobs:
           ISSUE_NUMBER=$(gh issue list --repo ${{ github.repository }} --label "notification" --state "open" --search "$DATE_TITLE" --json number --jq '.[0].number')
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           
-          if [[ "${{ github.repository_owner }}" != "WildKernels" ]]; then
+          if [[ "${{ github.repository_owner }}" != "pratikkabra143" ]]; then
             TARGET="@${{ github.repository_owner }}"
           else
             TARGET="@${{ github.repository_owner }}/oneplus-kernel-devs"
